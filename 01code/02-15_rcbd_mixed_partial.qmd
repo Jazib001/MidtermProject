@@ -1,0 +1,692 @@
+---
+title: "RCBD"
+Name: "Jazib Ali Irfan"
+format: html
+---
+
+# Introduction
+
+The dataset is of switchgrass progeny. The purpose of the RCBD experiment was to evaluate the progeny performance to find out the breeding values for parental population. The data compares the biomass yield of all genotypes and the variation of yield along with other traits (perimeter, tiller height upto the tip (HtTip_cm), Average tiller diameter, spring emergence (SE) and flowering time (FT)) across the two locations (Athens and Tifton), among the half-sib families (HSF), parental lines from which the progenies are derived (OriginalAccn). The dataset comprises of 3 ecotypes (coastal, upland and lowland). Upland is highly adpatable to cold regions, lowlands to hot climate and coastal to the coastal lines. The progenies are a mix of the three ecotypes and grown in he hotter region of Tifton and somewhat moderate region of Athens. The expectation is the better progeny performance in terms of higher yield in Tifton as compared to Athens. 
+
+# a) Setup
+
+Here is where we load the packages we will use.
+
+```{r setup}
+
+install.packages("XQuartz")
+# Loading packages
+library(tidyverse) # for data wrangling and plotting
+library(car) # for Anova function
+library(lme4)
+library(broom) # for model residuals extraction
+library(emmeans) # for model mean extraction
+```
+
+
+```{r}
+#| message: false
+#| warning: false
+```
+
+
+```{r data import}
+rcbd_gs <- read_csv("../02data/GS_IHF_TIFT Data_HSFGenoEco-2022.csv")
+
+rcbd_gs
+View(rcbd_gs)
+
+rcbd_gs = subset(rcbd_gs, select = -...25)
+
+rcbd_gs
+
+```
+
+# b) EDA tables
+
+```{r summary}
+summary(rcbd_gs)
+
+```
+
+```{r glimpse}
+glimpse(rcbd_gs)
+
+```
+
+# c) Wrangling
+
+```{r rcbd_gsw}
+library(tidyverse)
+
+rcbd_gsw = rcbd_gs %>%
+  mutate(Rep = as.factor(Rep),
+         Location = as.factor(Location),
+         HSF = as.factor(HSF),
+         Accn = as.factor(Accn),
+         OriginalAccn = as.factor(OriginalAccn),
+         Ecotype = as.factor(Ecotype))
+  
+rcbd_gsw
+
+```
+
+```{r summary_gsw}
+summary(rcbd_gsw)
+```
+
+# d) EDA plots
+
+```{r Perimeter boxplot}
+
+#| message: false
+#| warning: false
+
+ggplot(rcbd_gsw, aes(x = Perimeter, 
+                    y = Yield,
+                    color = Perimeter)) +
+  geom_boxplot() +
+  geom_jitter() +
+  theme(legend.position = "none")
+```
+
+```{r Httip boxplot}
+ggplot(rcbd_gsw, aes(x = HtTip_cm, 
+                    y = Yield,
+                    color = HtTip_cm)) +
+  geom_boxplot() +
+  geom_jitter() +
+  theme(legend.position = "none")
+```
+
+```{r Leaf boxplot}
+ggplot(rcbd_gsw, aes(x = FlgLen_cm + FlgWid_mm, 
+                    y = Yield,
+                    color = FlgLen_cm + FlgWid_mm)) +
+  geom_boxplot() +
+  geom_jitter() +
+  theme(legend.position = "none")
+```
+
+```{r tiller dia boxplot}
+ggplot(rcbd_gsw, aes(x = AvgTillDia_mm, 
+                    y = Yield,
+                    color = AvgTillDia_mm)) +
+  geom_boxplot() +
+  geom_jitter() +
+  theme(legend.position = "none")
+```
+
+```{r SE boxplot}
+ggplot(rcbd_gsw, aes(x = SE, 
+                    y = Yield,
+                    color = SE)) +
+  geom_boxplot() +
+  geom_jitter() +
+  theme(legend.position = "none")
+```
+
+```{r FT boxplot}
+ggplot(rcbd_gsw, aes(x = FT, 
+                    y = Yield,
+                    color = FT)) +
+  geom_boxplot() +
+  geom_jitter() +
+  theme(legend.position = "none")
+```
+
+```{r Location/OriginalAccn boxplot}
+ggplot(rcbd_gsw, aes(x = Location, 
+                    y = Yield,
+                    color = Location)) +
+  geom_boxplot() +
+  geom_jitter() +
+  facet_grid(.~OriginalAccn) +
+  theme(legend.position = "none")
+```
+
+# e) Statistical model
+
+```{r model1}
+install.packages("Matrix")
+# Changing to sum-to-zero contrast
+options(contrasts = c("contr.sum", "contr.poly"))
+
+# Model fitting
+rcbd_mix_mod1 = lmer(Yield ~ Location*Accn + (1|Rep), data = rcbd_gsw)
+
+rcbd_mix_mod1
+
+# Summary
+summary(rcbd_mix_mod1)
+```
+
+```{r model2}
+# Changing to sum-to-zero contrast
+options(contrasts = c("contr.sum", "contr.poly"))
+
+# Model fitting
+rcbd_mix_mod2 = lmer(Yield ~ Location*HSF + (1|Rep), data = rcbd_gsw)
+
+rcbd_mix_mod2
+
+# Summary
+summary(rcbd_mix_mod2)
+```
+
+```{r model3}
+# Changing to sum-to-zero contrast
+options(contrasts = c("contr.sum", "contr.poly"))
+
+# Model fitting
+rcbd_mix_mod3 = lmer(Yield ~ Location*OriginalAccn + (1|Rep), data = rcbd_gsw)
+
+rcbd_mix_mod3
+
+# Summary
+summary(rcbd_mix_mod3)
+```
+
+```{r model4}
+# Changing to sum-to-zero contrast
+options(contrasts = c("contr.sum", "contr.poly"))
+
+# Model fitting
+rcbd_mix_mod4 = lmer(Yield ~ Location*Ecotype + (1|Rep), data = rcbd_gsw)
+
+rcbd_mix_mod4
+
+# Summary
+summary(rcbd_mix_mod4)
+```
+
+Notice now how the `summary()` above has a new section for **random effects**.
+
+The variance attributed to blocks is 59932, and that still left in the residual error is 376416.
+
+Therefore, blocks are responsible for 59932 / (59932 + 376416) = **14% of the total noise** in this model.
+
+# f) ANOVA table
+
+```{r ANOVA 1}
+Anova(rcbd_mix_mod1 , type=3)
+```
+
+```{r ANOVA 2}
+Anova(rcbd_mix_mod2 , type=3)
+```
+
+```{r ANOVA 3}
+Anova(rcbd_mix_mod3 , type=3)
+```
+
+```{r ANOVA 4}
+Anova(rcbd_mix_mod4 , type=3)
+```
+
+# g) Linear model assumptions
+
+## Extracting residuals
+
+
+```{r rcbd_mix_resid1}
+install.packages("broom.mixed")
+library(broom.mixed)
+rcbd_mix_resid1 <- augment(rcbd_mix_mod1) %>%
+  mutate(.studresid=rstudent(rcbd_mix_mod1))
+
+rcbd_mix_resid1
+```
+
+```{r rcbd_mix_resid2}
+install.packages("broom.mixed")
+library(broom.mixed)
+rcbd_mix_resid2 <- augment(rcbd_mix_mod2) %>%
+  mutate(.studresid=rstudent(rcbd_mix_mod2))
+
+rcbd_mix_resid2
+```
+
+```{r rcbd_mix_resid3}
+install.packages("broom.mixed")
+library(broom.mixed)
+rcbd_mix_resid3 <- augment(rcbd_mix_mod3) %>%
+  mutate(.studresid=rstudent(rcbd_mix_mod3))
+
+rcbd_mix_resid2
+```
+
+```{r rcbd_mix_resid4}
+install.packages("broom.mixed")
+library(broom.mixed)
+rcbd_mix_resid4 <- augment(rcbd_mix_mod4) %>%
+  mutate(.studresid=rstudent(rcbd_mix_mod4))
+
+rcbd_mix_resid4
+```
+
+Now, let's recap the linear model assumptions:
+
+-   Independence (no pattern)\
+-   Variance homogeneity (homoscedasticity)\
+-   Normality\
+-   Outlier detection (\< -3 or \> 3)
+
+One difference in mixed models is that the 3 first assumptions are also applied to the **random effects**, so we need to check it for them as well.
+
+### Random effects are iid \~ N(0,var_a)
+
+```{r randeff_rep1}
+randeff_rep1 = ranef(rcbd_mix_mod1)$Rep
+
+randeff_rep1
+```
+
+```{r randeff_rep2}
+randeff_rep2 = ranef(rcbd_mix_mod2)$Rep
+
+randeff_rep2
+```
+
+```{r randeff_rep3}
+randeff_rep3 = ranef(rcbd_mix_mod3)$Rep
+
+randeff_rep3
+```
+
+```{r randeff_rep4}
+randeff_rep4 = ranef(rcbd_mix_mod4)$Rep
+
+randeff_rep4
+```
+
+For random effects with so few levels (i.e., 4 since that's the number of blocks), the QQ plot is one of the only ways to check for assumptions on random effects.
+
+```{r QQ plot for random effects 1}
+ggplot(randeff_rep1, aes(sample=`(Intercept)`))+
+  stat_qq(  shape = 21,
+            fill = "purple", 
+            size = 3,
+            alpha = .8
+  )+
+  stat_qq_line()+
+  labs(x = "Theoretical quantile",
+       y = "Sample quantile")+
+  theme_bw()
+```
+
+Nothing to worry here, especially since we only have 4 points.
+
+```{r QQ plot for random effects 2}
+ggplot(randeff_rep2, aes(sample=`(Intercept)`))+
+  stat_qq(  shape = 21,
+            fill = "purple", 
+            size = 3,
+            alpha = .8
+  )+
+  stat_qq_line()+
+  labs(x = "Theoretical quantile",
+       y = "Sample quantile")+
+  theme_bw()
+```
+
+```{r QQ plot for random effects 3}
+ggplot(randeff_rep3, aes(sample=`(Intercept)`))+
+  stat_qq(  shape = 21,
+            fill = "purple", 
+            size = 3,
+            alpha = .8
+  )+
+  stat_qq_line()+
+  labs(x = "Theoretical quantile",
+       y = "Sample quantile")+
+  theme_bw()
+```
+
+```{r QQ plot for random effects 4}
+ggplot(randeff_rep4, aes(sample=`(Intercept)`))+
+  stat_qq(  shape = 21,
+            fill = "purple", 
+            size = 3,
+            alpha = .8
+  )+
+  stat_qq_line()+
+  labs(x = "Theoretical quantile",
+       y = "Sample quantile")+
+  theme_bw()
+```
+
+### Within-group errors are iid \~ N(0, var_e)
+
+```{r mix_resid-1}
+ggplot(rcbd_mix_resid1, aes(x=.fitted, y=.studresid))+
+  geom_hline(yintercept = 0, color="red")+
+  geom_point(shape = 21,
+             fill = "purple", 
+             size = 3,
+             alpha = .8)+
+  geom_smooth()+
+  geom_hline(yintercept = c(-5,5), color = "red")+
+  theme_bw()
+```
+
+```{r mix_resid-2}
+ggplot(rcbd_mix_resid2, aes(x=.fitted, y=.studresid))+
+  geom_hline(yintercept = 0, color="red")+
+  geom_point(shape = 21,
+             fill = "purple", 
+             size = 3,
+             alpha = .8)+
+  geom_smooth()+
+  geom_hline(yintercept = c(-6,6), color = "red")+
+  theme_bw()
+```
+
+```{r mix_resid-3}
+ggplot(rcbd_mix_resid3, aes(x=.fitted, y=.studresid))+
+  geom_hline(yintercept = 0, color="red")+
+  geom_point(shape = 21,
+             fill = "purple", 
+             size = 3,
+             alpha = .8)+
+  geom_smooth()+
+  geom_hline(yintercept = c(-6,6), color = "red")+
+  theme_bw()
+```
+
+```{r mix_resid-4}
+ggplot(rcbd_mix_resid4, aes(x=.fitted, y=.studresid))+
+  geom_hline(yintercept = 0, color="red")+
+  geom_point(shape = 21,
+             fill = "purple", 
+             size = 3,
+             alpha = .8)+
+  geom_smooth()+
+  geom_hline(yintercept = c(-6,6), color = "red")+
+  theme_bw()
+```
+
+
+```{r mix_resid1}
+ggplot(rcbd_mix_resid1, aes(sample=.studresid))+
+  stat_qq(  shape = 21,
+            fill = "purple", 
+            size = 3,
+            alpha = .8
+  )+
+  stat_qq_line()+
+  labs(x = "Theoretical quantile",
+       y = "Sample quantile")+
+  theme_bw()
+```
+
+```{r mix_resid2}
+ggplot(rcbd_mix_resid2, aes(sample=.studresid))+
+  stat_qq(  shape = 21,
+            fill = "purple", 
+            size = 3,
+            alpha = .8
+  )+
+  stat_qq_line()+
+  labs(x = "Theoretical quantile",
+       y = "Sample quantile")+
+  theme_bw()
+```
+
+```{r mix_resid3}
+ggplot(rcbd_mix_resid3, aes(sample=.studresid))+
+  stat_qq(  shape = 21,
+            fill = "purple", 
+            size = 3,
+            alpha = .8
+  )+
+  stat_qq_line()+
+  labs(x = "Theoretical quantile",
+       y = "Sample quantile")+
+  theme_bw()
+```
+
+```{r mix_resid4}
+ggplot(rcbd_mix_resid4, aes(sample=.studresid))+
+  stat_qq(  shape = 21,
+            fill = "purple", 
+            size = 3,
+            alpha = .8
+  )+
+  stat_qq_line()+
+  labs(x = "Theoretical quantile",
+       y = "Sample quantile")+
+  theme_bw()
+```
+
+```{r mix_resid_1}
+ggplot(rcbd_mix_resid1, aes(x=.studresid))+
+  geom_density(color = "black",
+               fill = "purple",
+               alpha = .7)+
+  scale_x_continuous(breaks = c(-5,0,5), limits = c(-3,3))+
+  theme_bw()
+
+```
+
+```{r mix_resid_2}
+ggplot(rcbd_mix_resid2, aes(x=.studresid))+
+  geom_density(color = "black",
+               fill = "purple",
+               alpha = .7)+
+  scale_x_continuous(breaks = c(-6,0,6), limits = c(-3,3))+
+  theme_bw()
+
+```
+
+```{r mix_resid_3}
+ggplot(rcbd_mix_resid3, aes(x=.studresid))+
+  geom_density(color = "black",
+               fill = "purple",
+               alpha = .7)+
+  scale_x_continuous(breaks = c(-6,0,6), limits = c(-3,3))+
+  theme_bw()
+
+```
+
+```{r mix_resid_4}
+ggplot(rcbd_mix_resid4, aes(x=.studresid))+
+  geom_density(color = "black",
+               fill = "purple",
+               alpha = .7)+
+  scale_x_continuous(breaks = c(-6,0,6), limits = c(-3,3))+
+  theme_bw()
+
+```
+
+-   **Normality**: residuals seem normal.
+
+# h) Model means
+
+The next step in the workflow is extracting the model means.
+
+Remember that it is at this level that we establish the hierarchy of how our pairwise comparisons will be performed.
+
+Let's extract it by comparing everything to everything else.
+
+```{r interaction means-1}
+rcbd_mix_means1 <- emmeans(rcbd_mix_mod1, ~Location*Accn)
+
+rcbd_mix_means1
+```
+
+```{r interaction means-2}
+rcbd_mix_means2 <- emmeans(rcbd_mix_mod2, ~Location*HSF)
+
+rcbd_mix_means2
+```
+
+```{r interaction means-3}
+rcbd_mix_means3 <- emmeans(rcbd_mix_mod3, ~Location*OriginalAccn)
+
+rcbd_mix_means3
+```
+
+```{r interaction means-4}
+rcbd_mix_means4 <- emmeans(rcbd_mix_mod4, ~Location*Ecotype)
+
+rcbd_mix_means4
+```
+
+# i) Pairwise comparisons
+
+Now that we extracted means, let's perform pairwise comparisons among them.
+
+```{r interaction combining}
+rcbd_mix_cld_all = c(rcbd_mix_means1, rcbd_mix_means2, rcbd_mix_means3, rcbd_mix_means4)
+
+rcbd_mix_cld_all
+
+
+```
+
+```{r interaction 1}
+rcbd_mix_cld1 = (rcbd_mix_means1)
+
+rcbd_mix_cld1
+
+
+```
+
+```{r interaction means1}
+#library(multcompView)
+#library(multcomp)
+
+#SWG_meansComb1<- cld(rcbd_mix_cld1, 
+                   reversed=T, 
+                   adjust="none",
+               Letters=letters)
+#SWG_meansComb1
+
+
+```
+The chunk above was taking too long to analyze the predicted yield letters for 800 genotypes, so I skipped it after waiting for 48 hours. 
+
+```{r interaction 2}
+rcbd_mix_cld2 = (rcbd_mix_means2)
+
+rcbd_mix_cld2
+
+
+```
+
+
+```{r interaction means2}
+library(multcompView)
+library(multcomp)
+
+SWG_meansComb2<- cld(rcbd_mix_cld2, 
+                   reversed=T, 
+                   adjust="none",
+               Letters=letters)
+SWG_meansComb2
+
+
+```
+
+
+```{r interaction 3}
+rcbd_mix_cld3 = (rcbd_mix_means3)
+
+rcbd_mix_cld3
+
+
+```
+
+
+```{r interaction means3}
+library(multcompView)
+library(multcomp)
+
+SWG_meansComb3<- cld(rcbd_mix_cld3, 
+                   reversed=T, 
+                   adjust="none",
+               Letters=letters)
+SWG_meansComb3
+
+
+```
+
+
+```{r interaction 4}
+rcbd_mix_cld4 = (rcbd_mix_means4)
+
+rcbd_mix_cld4
+
+
+```
+
+```{r interaction means4}
+library(multcompView)
+library(multcomp)
+
+SWG_meansComb4 <- cld(rcbd_mix_cld4, 
+                   reversed=T, 
+                   adjust="none",
+               Letters=letters)
+SWG_meansComb4
+
+
+```
+
+
+Let's do some light wrangling here to be able to plot these.
+
+```{r selected}
+
+selected = SWG_meansComb4 %>%
+  as.data.frame() %>%
+  mutate(letter = trimws(.group)) 
+  
+
+selected
+
+```
+
+# g) Final plot
+
+For Final plot I will use the SWG_meanComb4 as it is the model which can be adjusted within time and in the form of a suitable plot. All other combinations were too large to be accomodated in the simple plot.
+
+```{r rcbd final plot}
+#| warning: false
+#| error: false
+
+ggplot(mapping = aes(fill = "OriginalAccn")) +
+  # Raw data and boxplots  
+  geom_boxplot(data = rcbd_gsw,
+               aes(x = Location, y = Yield),
+               alpha = .7) +
+  geom_jitter(data = selected,
+               aes(x = Ecotype, y = emmean),
+              shape = 22,
+              size = 3,
+              alpha = .7) +
+  geom_label(data = selected,
+             aes(x = Ecotype,
+                 y = emmean, 
+                 label = letter), fill = "green") +
+  labs(data = selected,
+       x = "Location",
+       y = "emmean") +
+  scale_fill_viridis_d() +
+  theme(legend.position = "none",
+        panel.grid.major.y = element_blank(),
+        panel.grid.minor.y = element_blank()
+        )
+
+```
+
+Final model shows that the better performance was at the Tifton regardless of the ecotype. The number of coastal and upland ecoytpes was less in comparison to lowlands. Becuase of more number of lowland genotypes with less biomass yield, the max yield was equivalent to 1400 kgs approximately for lowlands.  
+
+```{r save plot}
+ggsave("../03output/ggplot_GS.png",
+       width = 8,
+       height = 5)
+
+```
+
